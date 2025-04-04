@@ -4,8 +4,8 @@
   "description": "Advanced PDF to XML conversion API",
   "main": "index.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "jest"
   },
   "dependencies": {
