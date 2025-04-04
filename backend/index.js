@@ -49,8 +49,8 @@ const userSchema = new mongoose.Schema({
 const conversionSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     originalFilename: { type: String, required: true },
-    pdfPath: { type: String, required: true },
-    xmlPath: { type: String, required: true },
+    pdfPath: { type: mongoose.Schema.Types.ObjectId, required: true }, // Ensure ObjectId type
+    xmlPath: { type: mongoose.Schema.Types.ObjectId, required: true }, // Ensure ObjectId type
     createdAt: { type: Date, default: Date.now },
 });
 
@@ -93,7 +93,7 @@ async function convertPdfToXml(fileId, originalFilename) {
     try {
         // Retrieve the PDF file from GridFS
         const chunks = [];
-        const pdfStream = gfsBucket.openDownloadStream(fileId);
+        const pdfStream = gfsBucket.openDownloadStream(new mongoose.Types.ObjectId(fileId)); // Use 'new'
 
         for await (const chunk of pdfStream) {
             chunks.push(chunk);
@@ -154,7 +154,7 @@ async function convertPdfToXml(fileId, originalFilename) {
         uploadStream.end();
 
         return new Promise((resolve, reject) => {
-            uploadStream.on('finish', (file) => resolve(file._id));
+            uploadStream.on('finish', (file) => resolve(file._id)); // Return ObjectId
             uploadStream.on('error', (err) => reject(err));
         });
     } catch (error) {
@@ -244,13 +244,15 @@ app.post('/api/convert', authenticate, upload.single('pdf'), async (req, res) =>
             return res.status(400).json({ error: 'No PDF file uploaded' });
         }
 
+        // Convert the PDF to XML and get the XML file ID
         const xmlFileId = await convertPdfToXml(req.file.id, req.file.originalname);
 
+        // Save the conversion record
         const newConversion = new Conversion({
             userId: req.user.userId,
             originalFilename: req.file.originalname,
-            pdfPath: req.file.id,
-            xmlPath: xmlFileId,
+            pdfPath: new mongoose.Types.ObjectId(req.file.id), // Use 'new'
+            xmlPath: new mongoose.Types.ObjectId(xmlFileId), // Use 'new'
         });
 
         const savedConversion = await newConversion.save();
@@ -321,20 +323,24 @@ app.get('/api/conversion/:id/xml', authenticate, async (req, res) => {
 app.get('/api/conversion/:id/download', authenticate, async (req, res) => {
     try {
         const conversionId = req.params.id;
+        console.log('Download request for conversion ID:', conversionId);
+
         const conversion = await Conversion.findOne({
             _id: conversionId,
             userId: req.user.userId,
         });
 
         if (!conversion) {
+            console.log('Conversion not found for ID:', conversionId);
             return res.status(404).json({ error: 'Conversion not found' });
         }
 
-        const readStream = gfsBucket.openDownloadStream(conversion.xmlPath);
+        const readStream = gfsBucket.openDownloadStream(new mongoose.Types.ObjectId(conversion.xmlPath)); // Use 'new'
         res.header(
             'Content-Disposition',
             `attachment; filename="${conversion.originalFilename.replace('.pdf', '')}.xml"`
         );
+        res.header('Content-Type', 'application/xml');
         readStream.pipe(res);
     } catch (error) {
         console.error('Download XML error:', error);

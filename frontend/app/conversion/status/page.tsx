@@ -56,7 +56,43 @@ export default function ConversionStatus() {
         )}
         {status === "completed" && (
           <button
-            onClick={() => router.push(`/conversion/${conversionId}/download`)}
+            onClick={async () => {
+              try {
+                const response = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL}/api/conversion/${conversionId}/download`,
+                  {
+                    method: "GET",
+                    headers: {
+                      Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                  }
+                );
+
+                if (!response.ok) {
+                  throw new Error("Failed to download the file");
+                }
+
+                // Get the file blob
+                const blob = await response.blob();
+
+                // Create a temporary URL for the file
+                const url = window.URL.createObjectURL(blob);
+
+                // Create a link element and trigger the download
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${conversionId}.xml`; // Set the file name
+                document.body.appendChild(a);
+                a.click();
+
+                // Clean up the URL object
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+              } catch (error) {
+                console.error("Download error:", error);
+                alert("Failed to download the file. Please try again.");
+              }
+            }}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg"
           >
             Download XML
